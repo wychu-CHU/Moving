@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>走動的圖形 - 視藝科</title>
+    <style>
+        /* --- 全局設定 --- */
+        body {
+            margin: 0; padding: 0;
+            background-color: #222; color: #FFF;
+            font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
+            overflow: hidden; user-select: none;
+            display: flex; flex-direction: column; height: 100vh;
+        }
+
+        /* --- 畫面控制 --- */
+        .screen { display: none; width: 100%; height: 100%; position: relative; flex-direction: column; align-items: center; justify-content: center; }
+        .active { display: flex; }
+
+        /* --- 主選單 --- */
+        #menu h1 { color: #00FFFF; font-size: 4rem; margin-bottom: 20px; letter-spacing: 5px; }
+        .btn-start {
+            font-size: 2.5rem; padding: 20px 60px; border-radius: 50px;
+            background: linear-gradient(45deg, #FF007F, #FFD700);
+            color: #FFF; border: none; cursor: pointer; font-weight: bold;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5); transition: transform 0.2s;
+        }
+        .btn-start:active { transform: scale(0.95); }
+
+        /* --- 遊戲區 --- */
+        #game-screen { flex-direction: row; background: #000; } /* 黑色背景 */
+
+        /* 左側：工具列 */
+        #toolbar {
+            width: 250px; height: 100%; background: #1a1a1a;
+            border-right: 3px solid #333; display: flex; flex-direction: column;
+            padding: 20px; box-sizing: border-box; overflow-y: auto; z-index: 100;
+        }
+        
+        .tool-section { margin-bottom: 30px; }
+        .tool-title { font-size: 1.5rem; color: #AAA; margin-bottom: 15px; border-bottom: 2px solid #555; padding-bottom: 5px; }
+        
+        /* 顏色選擇按鈕 */
+        .color-grid, .shape-grid { display: flex; flex-wrap: wrap; gap: 15px; }
+        .color-btn {
+            width: 50px; height: 50px; border-radius: 50%; cursor: pointer;
+            border: 3px solid transparent; transition: transform 0.2s;
+        }
+        .color-btn.selected { border-color: #FFF; transform: scale(1.2); box-shadow: 0 0 15px #FFF; }
+
+        /* 形狀選擇按鈕 */
+        .shape-btn {
+            width: 60px; height: 60px; background: #555; cursor: pointer;
+            display: flex; justify-content: center; align-items: center;
+            border: 3px solid transparent; border-radius: 10px; transition: transform 0.2s;
+        }
+        .shape-btn.selected { border-color: #00FFFF; background: #777; transform: scale(1.1); box-shadow: 0 0 15px #00FFFF; }
+        
+        /* 工具列預覽形狀 */
+        .icon-square { width: 30px; height: 30px; background: #FFF; }
+        .icon-circle { width: 35px; height: 35px; background: #FFF; border-radius: 50%; }
+        .icon-triangle { width: 35px; height: 35px; background: #FFF; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+        .icon-rect { width: 40px; height: 20px; background: #FFF; }
+
+        /* 操作按鈕 */
+        .action-btn {
+            width: 100%; padding: 15px; margin-bottom: 15px; font-size: 1.2rem;
+            font-weight: bold; cursor: pointer; border-radius: 10px; border: none; color: #FFF;
+        }
+        .btn-walk { background: #8A2BE2; }
+        .btn-clear { background: #FF4500; }
+        .btn-home { background: #555; }
+
+        /* --- 畫布區 --- */
+        #canvas-area {
+            flex-grow: 1; height: 100%; position: relative; overflow: hidden;
+            cursor: crosshair;
+        }
+
+        /* --- 動態生成的圖形 --- */
+        .art-shape {
+            position: absolute; cursor: grab;
+            box-shadow: 2px 2px 10px rgba(0,0,0,0.5);
+            /* 預設大小 */
+            width: 100px; height: 100px;
+        }
+        .art-shape:active { cursor: grabbing; }
+
+        /* --- 動畫效果 (走動的圖形) --- */
+        .anim-walk-1 { animation: walk1 4s infinite alternate ease-in-out; }
+        .anim-walk-2 { animation: walk2 3s infinite alternate ease-in-out; }
+        .anim-walk-3 { animation: walk3 5s infinite linear; }
+
+        @keyframes walk1 {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            100% { transform: translate(30px, -50px) rotate(20deg); }
+        }
+        @keyframes walk2 {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(-40px, 30px) scale(1.2) rotate(-15deg); }
+        }
+        @keyframes walk3 {
+            0% { transform: rotate(0deg) translate(20px) rotate(0deg); }
+            100% { transform: rotate(360deg) translate(20px) rotate(-360deg); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="menu" class="screen active">
+        <h1>走動的圖形</h1>
+        <p style="font-size: 1.5rem; color: #CCC; margin-bottom: 40px;">在黑板上創作你的專屬藝術吧！</p>
+        <button class="btn-start" onclick="startGame()">開始創作</button>
+    </div>
+
+    <div id="game-screen" class="screen">
+        
+        <div id="toolbar">
+            
+            <div class="tool-section">
+                <div class="tool-title">1. 選顏色</div>
+                <div class="color-grid">
+                    <div class="color-btn selected" style="background: #FF3B30;" onclick="setColor('#FF3B30', this)"></div>
+                    <div class="color-btn" style="background: #FFCC00;" onclick="setColor('#FFCC00', this)"></div>
+                    <div class="color-btn" style="background: #4CD964;" onclick="setColor('#4CD964', this)"></div>
+                    <div class="color-btn" style="background: #34AADC;" onclick="setColor('#34AADC', this)"></div>
+                    <div class="color-btn" style="background: #FFFFFF;" onclick="setColor('#FFFFFF', this)"></div>
+                    <div class="color-btn" style="background: #FF69B4;" onclick="setColor('#FF69B4', this)"></div>
+                </div>
+            </div>
+
+            <div class="tool-section">
+                <div class="tool-title">2. 選形狀</div>
+                <div class="shape-grid">
+                    <div class="shape-btn selected" onclick="setShape('circle', this)">
+                        <div class="icon-circle"></div>
+                    </div>
+                    <div class="shape-btn" onclick="setShape('square', this)">
+                        <div class="icon-square"></div>
+                    </div>
+                    <div class="shape-btn" onclick="setShape('triangle', this)">
+                        <div class="icon-triangle"></div>
+                    </div>
+                    <div class="shape-btn" onclick="setShape('rect', this)">
+                        <div class="icon-rect"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="flex-grow: 1;"></div> <button class="action-btn btn-walk" id="walkBtn" onclick="toggleWalk()">✨ 讓圖形走動 ✨</button>
+            <button class="action-btn btn-clear" onclick="clearCanvas()">🗑️ 清除畫板</button>
+            <button class="action-btn btn-home" onclick="goHome()">🏠 回主選單</button>
+            <p style="color:#777; font-size:0.9rem; text-align:center;">提示：點擊黑板加入圖形，按住圖形可以移動。</p>
+        </div>
+
+        <div id="canvas-area" onclick="addShapeToCanvas(event)">
+            </div>
+
+    </div>
+
+    <script>
+        // --- 狀態變數 ---
+        let currentColor = '#FF3B30';
+        let currentShape = 'circle';
+        let isWalking = false;
+        let draggedElement = null;
+        let offsetX = 0, offsetY = 0;
+
+        // --- 音效 ---
+        function playPopSound() {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            osc.start(); osc.stop(ctx.currentTime + 0.1);
+        }
+
+        // --- 遊戲控制 ---
+        function startGame() {
+            document.getElementById('menu').classList.remove('active');
+            document.getElementById('game-screen').classList.add('active');
+        }
+
+        function goHome() {
+            document.getElementById('game-screen').classList.remove('active');
+            document.getElementById('menu').classList.add('active');
+        }
+
+        function setColor(color, btnEl) {
+            currentColor = color;
+            document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
+            btnEl.classList.add('selected');
+        }
+
+        function setShape(shape, btnEl) {
+            currentShape = shape;
+            document.querySelectorAll('.shape-btn').forEach(btn => btn.classList.remove('selected'));
+            btnEl.classList.add('selected');
+        }
+
+        function clearCanvas() {
+            document.getElementById('canvas-area').innerHTML = '';
+            if(isWalking) toggleWalk(); // 關閉走動模式
+        }
+
+        function toggleWalk() {
+            const shapes = document.querySelectorAll('.art-shape');
+            if (shapes.length === 0) return;
+
+            isWalking = !isWalking;
+            const walkBtn = document.getElementById('walkBtn');
+
+            if (isWalking) {
+                walkBtn.innerText = "⏸️ 停止走動";
+                walkBtn.style.background = "#FF1493";
+                
+                // 為每個圖形隨機加上不同的走動動畫
+                const anims = ['anim-walk-1', 'anim-walk-2', 'anim-walk-3'];
+                shapes.forEach(shape => {
+                    const randomAnim = anims[Math.floor(Math.random() * anims.length)];
+                    shape.classList.add(randomAnim);
+                });
+            } else {
+                walkBtn.innerText = "✨ 讓圖形走動 ✨";
+                walkBtn.style.background = "#8A2BE2";
+                
+                shapes.forEach(shape => {
+                    shape.classList.remove('anim-walk-1', 'anim-walk-2', 'anim-walk-3');
+                });
+            }
+        }
+
+        // --- 畫布互動 (加入與拖曳) ---
+        function addShapeToCanvas(e) {
+            // 如果點擊的是已經存在的圖形（準備拖曳），或者是正在拖曳中，則不新增圖形
+            if (e.target.classList.contains('art-shape') || draggedElement != null) {
+                return; 
+            }
+
+            playPopSound();
+
+            const canvas = document.getElementById('canvas-area');
+            const rect = canvas.getBoundingClientRect();
+            
+            // 計算點擊位置 (讓圖形中心對準鼠標)
+            const x = e.clientX - rect.left - 50; 
+            const y = e.clientY - rect.top - 50;
+
+            const el = document.createElement('div');
+            el.className = 'art-shape';
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            el.style.backgroundColor = currentColor;
+
+            // 根據選擇設定形狀 CSS
+            if (currentShape === 'circle') {
+                el.style.borderRadius = '50%';
+            } else if (currentShape === 'square') {
+                // 預設就是正方形
+            } else if (currentShape === 'triangle') {
+                el.style.clipPath = 'polygon(50% 0%, 0% 100%, 100% 100%)';
+            } else if (currentShape === 'rect') {
+                el.style.width = '120px';
+                el.style.height = '60px';
+                el.style.left = (x - 10) + 'px'; // 稍微調整偏移
+            }
+
+            // 如果目前正在「走動模式」，新加入的圖形也要動起來
+            if (isWalking) {
+                const anims = ['anim-walk-1', 'anim-walk-2', 'anim-walk-3'];
+                el.classList.add(anims[Math.floor(Math.random() * anims.length)]);
+            }
+
+            // 綁定拖曳事件 (支援滑鼠與觸控)
+            el.addEventListener('mousedown', dragStart);
+            el.addEventListener('touchstart', dragStart, {passive: false});
+
+            canvas.appendChild(el);
+        }
+
+        // --- 拖曳邏輯 ---
+        function dragStart(e) {
+            if (e.type === 'touchstart') e.preventDefault();
+            draggedElement = e.target;
+            
+            const rect = draggedElement.getBoundingClientRect();
+            const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+            
+            offsetX = clientX - rect.left;
+            offsetY = clientY - rect.top;
+
+            document.addEventListener('mousemove', dragMove);
+            document.addEventListener('touchmove', dragMove, {passive: false});
+            document.addEventListener('mouseup', dragEnd);
+            document.addEventListener('touchend', dragEnd);
+        }
+
+        function dragMove(e) {
+            if (!draggedElement) return;
+            if (e.type === 'touchmove') e.preventDefault();
+
+            const canvas = document.getElementById('canvas-area').getBoundingClientRect();
+            const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+
+            // 計算相對於畫布的位置
+            let newX = clientX - canvas.left - offsetX;
+            let newY = clientY - canvas.top - offsetY;
+
+            draggedElement.style.left = newX + 'px';
+            draggedElement.style.top = newY + 'px';
+        }
+
+        function dragEnd() {
+            draggedElement = null;
+            document.removeEventListener('mousemove', dragMove);
+            document.removeEventListener('touchmove', dragMove);
+            document.removeEventListener('mouseup', dragEnd);
+            document.removeEventListener('touchend', dragEnd);
+            
+            // 延遲一點點解除 draggedElement，防止觸發父元素的點擊新增事件
+            setTimeout(() => { draggedElement = null; }, 50);
+        }
+
+    </script>
+</body>
+</html>
